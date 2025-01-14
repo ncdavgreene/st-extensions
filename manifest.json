@@ -1,0 +1,7 @@
+{
+    "name": "Play Sound Extension",
+    "description": "Adds a slash command to play custom sounds.",
+    "author": "Your Name",
+    "version": "1.0",
+    "entry": "playSoundExtension.js"
+}
