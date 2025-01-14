@@ -1,28 +1,64 @@
-(function () {
-    // Register a custom slash command
-    const playSoundCommand = {
-        command: "/playsound",
-        description: "Play a custom sound file.",
-        action: (args) => {
-            // Extract the sound name from the args
-            const soundName = args.join(" ");
-            if (!soundName) {
-                alert("Please specify a sound name!");
-                return;
-            }
+import { SlashCommandParser } from '../../../slash-commands/SlashCommandParser.js';
+import { SlashCommand } from '../../../slash-commands/SlashCommand.js';
+import { SlashCommandArgument } from '../../../slash-commands/SlashCommandArgument.js';
+import { SlashCommandEnumValue, enumTypes } from '../../../slash-commands/SlashCommandEnumValue.js';
+import { enumIcons } from '../../../slash-commands/SlashCommandCommonEnumsProvider.js';
 
-            // Path to the sound file
-            const soundPath = `sounds/${soundName}.mp3`;
+const DEBUG_PREFIX = '<PlaySound Extension>';
+const SOUNDS_FOLDER = 'extensions/PlaySound/sounds';
 
-            // Create and play audio
-            const audio = new Audio(soundPath);
-            audio.play().catch((error) => {
-                console.error("Error playing sound:", error);
-                alert(`Sound "${soundName}" not found or cannot be played.`);
-            });
-        },
-    };
+// Initialize the sound folder and available sounds
+let availableSounds = [];
 
-    // Register the command with SillyTavern
-    window.registerSlashCommand(playSoundCommand);
-})();
+async function loadAvailableSounds() {
+    try {
+        const response = await fetch(`${SOUNDS_FOLDER}/list.json`);
+        availableSounds = response.ok ? await response.json() : [];
+        console.debug(DEBUG_PREFIX, 'Loaded available sounds:', availableSounds);
+    } catch (error) {
+        console.error(DEBUG_PREFIX, 'Failed to load available sounds:', error);
+    }
+}
+
+// Command to play a sound
+async function playSoundSlashCommand(_, soundName) {
+    if (!soundName) {
+        console.log(DEBUG_PREFIX, 'No sound name provided');
+        return '';
+    }
+
+    // Match sound name
+    const soundPath = availableSounds.find(sound => sound.toLowerCase() === soundName.trim().toLowerCase());
+    if (!soundPath) {
+        console.log(DEBUG_PREFIX, 'Sound not found:', soundName);
+        return '';
+    }
+
+    // Play the sound
+    const audio = new Audio(`${SOUNDS_FOLDER}/${soundPath}`);
+    audio.play().catch(error => console.error(DEBUG_PREFIX, 'Error playing sound:', error));
+
+    return '';
+}
+
+// Register the slash command
+jQuery(async () => {
+    console.debug(DEBUG_PREFIX, 'Loading PlaySound Extension...');
+    await loadAvailableSounds();
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'playsound',
+        helpString: 'Play a custom sound from the available sounds.',
+        callback: playSoundSlashCommand,
+        unnamedArgumentList: [
+            SlashCommandArgument.fromProps({
+                description: 'Sound name',
+                isRequired: true,
+                acceptsMultiple: false,
+                enumProvider: () => availableSounds.map(
+                    sound => new SlashCommandEnumValue(sound, null, enumTypes.string, enumIcons.file)
+                ),
+            }),
+        ],
+    }));
+});
